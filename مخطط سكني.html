@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>مخطط سكني</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:Tahoma,Arial,sans-serif;background:#f0f2f5;color:#222;display:flex;flex-direction:column;height:100dvh}
+
+/* ══ SHARED ══ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:8px 14px;border-radius:9px;border:1px solid #dde1e7;background:#f5f7fa;color:#444;font-size:13px;cursor:pointer;font-family:Tahoma,Arial,sans-serif;white-space:nowrap;-webkit-appearance:none;appearance:none}
+.btn:active{opacity:.75}
+.btn.on{background:#dbeafe;border-color:#3b82f6;color:#1d4ed8}
+.btn.on-road{background:#ffedd5;border-color:#f97316;color:#c2410c}
+.btn.on-pan{background:#f0fdf4;border-color:#22c55e;color:#15803d}
+.btn.on-del{background:#fee2e2;border-color:#ef4444;color:#991b1b}
+.btn:disabled{opacity:.4}
+.btn-primary{background:linear-gradient(135deg,#4f8ef7,#7c3aed);border-color:transparent;color:#fff;font-weight:700}
+input[type=color]{width:30px;height:28px;border-radius:6px;border:1px solid #dde1e7;background:none;cursor:pointer;padding:2px;-webkit-appearance:none}
+input[type=range]{accent-color:#4f8ef7}
+.sw{width:24px;height:24px;border-radius:6px;border:2px solid transparent;cursor:pointer;flex-shrink:0;display:inline-block}
+.sw.on{border-color:#222}
+.status{font-size:12px;padding:3px 10px;border-radius:6px;white-space:nowrap}
+.status.idle{color:#aaa}
+.status.saving{background:#fef9c3;color:#854d0e}
+.status.saved{background:#dcfce7;color:#166534}
+.status.error{background:#fee2e2;color:#991b1b}
+
+/* ══ CANVAS AREA ══ */
+#wrap{flex:1;position:relative;overflow:hidden;background:#ccc;min-height:0}
+#c{position:absolute;top:0;left:0;transform-origin:0 0;image-rendering:pixelated;touch-action:none}
+#dz{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#f0f2f5;z-index:5;padding:20px;text-align:center;pointer-events:none}
+#dz.hide{display:none}
+#dz h2{font-size:18px;font-weight:700}
+#dz p{font-size:13px;color:#888}
+
+/* ══ MODAL ══ */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.sheet-modal{background:#fff;border-radius:20px 20px 0 0;padding:24px 20px 32px;width:100%;max-width:500px}
+.sheet-modal h3{font-size:17px;font-weight:700;margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:#888;margin-bottom:6px}
+.field input[type=text]{width:100%;padding:12px 14px;border:1px solid #dde1e7;border-radius:10px;font-size:16px;font-family:Tahoma,Arial,sans-serif;outline:none}
+.field input[type=text]:focus{border-color:#3b82f6}
+.upload-box{border:2px dashed #dde1e7;border-radius:12px;padding:22px;text-align:center;cursor:pointer;color:#888;font-size:14px}
+.upload-box.done{border-color:#22c55e;background:#f0fdf4;color:#166534}
+.row-btns{display:flex;gap:10px;margin-top:16px}
+.row-btns .btn{flex:1;padding:13px;font-size:15px;justify-content:center}
+
+/* confirm */
+#confirm-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center;padding:20px}
+#confirm-overlay.open{display:flex}
+#confirm-box{background:#fff;border-radius:14px;padding:22px 20px;width:100%;max-width:320px}
+#confirm-box p{font-size:14px;color:#333;margin-bottom:14px;line-height:1.6}
+#confirm-box .row-btns .btn{padding:11px}
+
+/* ══ DESKTOP ══ */
+#desk-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 12px;background:#fff;border-bottom:1px solid #dde1e7;flex-shrink:0}
+#desk-bottom{display:flex;align-items:center;gap:8px;padding:4px 12px;background:#fff;border-top:1px solid #dde1e7;font-size:11px;color:#888;flex-shrink:0}
+.vsep{width:1px;height:22px;background:#dde1e7;flex-shrink:0}
+.spacer{flex:1}
+
+/* plans dropdown */
+.dd-wrap{position:relative}
+#plans-drop{display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid #dde1e7;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:260px;z-index:8000;overflow:hidden}
+#plans-drop.open{display:block}
+.drop-hdr{padding:9px 13px;font-size:11px;font-weight:700;color:#888;border-bottom:1px solid #f0f2f5;background:#f9fafb}
+.drop-body{max-height:280px;overflow-y:auto}
+.plan-row{display:flex;align-items:center;gap:9px;padding:9px 13px;cursor:pointer;border-bottom:1px solid #f5f5f5}
+.plan-row:hover{background:#f0f4ff}
+.plan-row.cur{background:#eff6ff}
+.plan-row img,.plan-row .no-img{width:44px;height:32px;border-radius:5px;flex-shrink:0;object-fit:cover;border:1px solid #e5e7eb}
+.plan-row .no-img{border:1px dashed #d1d5db;background:#f9fafb;display:flex;align-items:center;justify-content:center;font-size:16px}
+.plan-info{flex:1;min-width:0}
+.plan-name{font-size:12px;font-weight:600;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plan-date{font-size:10px;color:#999}
+.del-btn{padding:3px 7px;border-radius:4px;border:1px solid #fecaca;background:#fff;color:#ef4444;font-size:10px;cursor:pointer;flex-shrink:0}
+.drop-empty{padding:20px;text-align:center;color:#aaa;font-size:12px}
+
+/* ══ MOBILE ══ */
+#mob-top{display:none}
+#mob-bottom{display:none}
+
+/* bottom sheet */
+#sheet-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:7000}
+#sheet{display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:20px 20px 0 0;z-index:7001;max-height:75dvh;flex-direction:column;transform:translateY(100%);transition:transform .28s ease}
+#sheet.open{transform:translateY(0)}
+#sheet-bg.open,#sheet.open{display:flex}
+.sh-handle{width:36px;height:4px;background:#dde1e7;border-radius:2px;margin:10px auto 6px;flex-shrink:0}
+.sh-hdr{display:flex;align-items:center;justify-content:space-between;padding:4px 16px 10px;flex-shrink:0}
+.sh-title{font-size:16px;font-weight:700}
+.sh-body{overflow-y:auto;flex:1;padding:0 8px 16px}
+.sh-new-btn{display:block;margin:0 8px 8px;padding:13px;background:linear-gradient(135deg,#4f8ef7,#7c3aed);border:none;border-radius:13px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:Tahoma,Arial,sans-serif;width:calc(100% - 16px);text-align:center;flex-shrink:0}
+.sh-row{display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:10px;cursor:pointer;margin-bottom:2px}
+.sh-row:active{background:#f0f4ff}
+.sh-row.cur{background:#eff6ff}
+.sh-row img,.sh-row .no-img{width:50px;height:36px;border-radius:7px;flex-shrink:0;object-fit:cover;border:1px solid #e5e7eb}
+.sh-row .no-img{border:1px dashed #d1d5db;background:#f9fafb;display:flex;align-items:center;justify-content:center;font-size:18px}
+.sh-info{flex:1;min-width:0}
+.sh-name{font-size:14px;font-weight:600;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sh-date{font-size:11px;color:#999;margin-top:1px}
+.sh-del{padding:5px 9px;border-radius:7px;border:1px solid #fecaca;background:#fff;color:#ef4444;font-size:11px;cursor:pointer;flex-shrink:0}
+
+@media(max-width:768px){
+  #desk-top,#desk-bottom{display:none!important}
+  #mob-top{
+    display:flex;align-items:center;gap:7px;
+    padding:8px 12px;background:#fff;border-bottom:1px solid #dde1e7;
+    flex-shrink:0;min-height:50px;
+  }
+  #mob-bottom{
+    display:flex;flex-direction:column;background:#fff;
+    border-top:1px solid #dde1e7;flex-shrink:0;
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  #mob-plan{flex:1;font-size:14px;font-weight:600;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .top-btn{width:36px;height:36px;border-radius:9px;border:1px solid #dde1e7;background:#f5f7fa;display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer;flex-shrink:0}
+  .top-btn:active{opacity:.7}
+  #mob-status{font-size:11px;padding:3px 8px;border-radius:6px;white-space:nowrap;flex-shrink:0}
+  #mob-status.idle{color:#aaa}
+  #mob-status.saving{background:#fef9c3;color:#854d0e}
+  #mob-status.saved{background:#dcfce7;color:#166534}
+  #mob-status.error{background:#fee2e2;color:#991b1b}
+
+  /* road hint */
+  #road-hint{display:none;align-items:center;justify-content:center;gap:10px;padding:8px;background:#f97316;color:#fff;font-size:13px;font-weight:600}
+  #road-hint.show{display:flex}
+  #road-hint button{background:rgba(255,255,255,.3);border:none;color:#fff;padding:5px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Tahoma,Arial,sans-serif}
+
+  /* tools */
+  .mob-tools{display:flex;justify-content:space-around;padding:6px 4px 2px}
+  .mob-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border-radius:10px;cursor:pointer;min-width:44px;border:none;background:transparent;font-family:Tahoma,Arial,sans-serif}
+  .mob-btn:active{background:#f0f0f0}
+  .mob-btn .ic{font-size:22px;line-height:1;display:block}
+  .mob-btn .tx{font-size:10px;color:#666;display:block;white-space:nowrap}
+  .mob-btn.on{background:#dbeafe}.mob-btn.on .tx{color:#1d4ed8}
+  .mob-btn.on-road{background:#ffedd5}.mob-btn.on-road .tx{color:#c2410c}
+  .mob-btn.on-del{background:#fee2e2}.mob-btn.on-del .tx{color:#991b1b}
+
+  /* colors row */
+  .mob-colors{display:flex;align-items:center;gap:7px;padding:4px 10px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .mob-colors::-webkit-scrollbar{display:none}
+  .mc-lbl{font-size:11px;color:#888;white-space:nowrap;flex-shrink:0}
+  .mc-sw{width:28px;height:28px;border-radius:7px;border:2px solid transparent;flex-shrink:0;display:block}
+  .mc-sw.on{border-color:#222}
+  .mob-colors input[type=color]{width:28px;height:28px;border-radius:7px;border:1px solid #dde1e7;padding:1px;flex-shrink:0}
+  .mob-colors input[type=range]{width:80px;flex-shrink:0}
+  .mc-sep{width:1px;height:22px;background:#dde1e7;flex-shrink:0}
+  .mc-btn{padding:5px 9px;border-radius:7px;border:1px solid #dde1e7;background:#f5f7fa;font-size:11px;cursor:pointer;font-family:Tahoma,Arial,sans-serif;white-space:nowrap}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ DESKTOP ══ -->
+<div id="desk-top">
+  <div id="dt-tools" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+    <button class="btn on" id="d-fill" onclick="setTool('fill')">🪣 تلوين</button>
+    <button class="btn" id="d-road" onclick="setTool('road')">✏️ شارع</button>
+    <button class="btn" id="d-pan"  onclick="setTool('pan')">✋ تحريك</button>
+    <button class="btn" id="d-del"  onclick="setTool('del')">🗑️ حذف</button>
+    <div class="vsep"></div>
+    <input type="color" id="fc" value="#22c55e">
+    <input type="range" id="falpha" min="20" max="220" value="110" style="width:65px">
+    <div class="sw on" id="sw0" style="background:#22c55e" onclick="pickColor('#22c55e',0)"></div>
+    <div class="sw" id="sw1" style="background:#f97316" onclick="pickColor('#f97316',1)"></div>
+    <div class="sw" id="sw2" style="background:#3b82f6" onclick="pickColor('#3b82f6',2)"></div>
+    <div class="sw" id="sw3" style="background:#eab308" onclick="pickColor('#eab308',3)"></div>
+    <div class="sw" id="sw4" style="background:#ef4444" onclick="pickColor('#ef4444',4)"></div>
+    <div class="vsep"></div>
+    <input type="color" id="rc" value="#ef4444">
+    <input type="range" id="rw" min="2" max="20" value="5" style="width:65px">
+    <div class="vsep"></div>
+    <button class="btn" id="d-undo" onclick="undo()" disabled>↩</button>
+    <button class="btn" id="d-redo" onclick="redo()" disabled>↪</button>
+    <button class="btn" onclick="clearAll()">🗑</button>
+    <button class="btn" onclick="exportImg()">💾</button>
+    <div class="vsep"></div>
+    <button class="btn" onclick="doZoom(1.25)">🔍+</button>
+    <span id="zlbl" style="font-size:12px;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:5px">100%</span>
+    <button class="btn" onclick="doZoom(0.8)">🔍−</button>
+    <button class="btn" onclick="fitZoom()">⬜</button>
+  </div>
+  <div class="spacer"></div>
+  <span id="d-status" class="status idle"></span>
+  <div class="vsep"></div>
+  <button class="btn btn-primary" onclick="openModal()">＋ مخطط جديد</button>
+  <div class="dd-wrap">
+    <button class="btn" onclick="toggleDrop()">📋 مخططاتي ▾</button>
+    <div id="plans-drop">
+      <div class="drop-hdr">المخططات المحفوظة</div>
+      <div class="drop-body" id="drop-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CANVAS ══ -->
+<div id="wrap">
+  <div id="dz">
+    <span style="font-size:48px">🗺️</span>
+    <h2>أنشئ مخططاً جديداً للبدء</h2>
+    <p id="dz-p">اضغط "＋ مخطط جديد"</p>
+  </div>
+  <canvas id="c" style="touch-action:none"></canvas>
+</div>
+
+<!-- ══ DESKTOP BOTTOM ══ -->
+<div id="desk-bottom">
+  <span id="d-plan">لا يوجد مخطط</span>
+  <span id="coord" style="margin-right:auto">x:0 y:0</span>
+  <span>تلوين: انقر | شارع: انقر نقطة نقطة + نقرتين للإنهاء | Space: تحريك</span>
+</div>
+
+<!-- ══ MOBILE TOP ══ -->
+<div id="mob-top">
+  <span id="mob-plan">اختر مخططاً أو أنشئ جديداً</span>
+  <span id="mob-status" class="idle"></span>
+  <div class="top-btn" onclick="doZoom(1.3)">＋</div>
+  <div class="top-btn" onclick="doZoom(0.77)">－</div>
+  <div class="top-btn" onclick="fitZoom()">⬜</div>
+  <div class="top-btn" onclick="exportImg()">💾</div>
+</div>
+
+<!-- ══ MOBILE BOTTOM ══ -->
+<div id="mob-bottom">
+  <div id="road-hint">
+    ✏️ انقر لإضافة نقاط الشارع
+    <button onclick="finishRoad()">إنهاء ✓</button>
+  </div>
+  <div class="mob-tools">
+    <button class="mob-btn on"  id="m-fill" onclick="setTool('fill')"><span class="ic">🪣</span><span class="tx">تلوين</span></button>
+    <button class="mob-btn" id="m-road" onclick="setTool('road')"><span class="ic">✏️</span><span class="tx">شارع</span></button>
+    <button class="mob-btn" id="m-pan"  onclick="setTool('pan')"><span class="ic">✋</span><span class="tx">تحريك</span></button>
+    <button class="mob-btn" id="m-del"  onclick="setTool('del')"><span class="ic">🗑️</span><span class="tx">حذف</span></button>
+    <button class="mob-btn" id="m-undo" onclick="undo()" style="opacity:.4"><span class="ic">↩</span><span class="tx">تراجع</span></button>
+    <button class="mob-btn" onclick="openSheet()"><span class="ic">📋</span><span class="tx">مخططاتي</span></button>
+    <button class="mob-btn" onclick="openModal()"><span class="ic">＋</span><span class="tx">جديد</span></button>
+  </div>
+  <div class="mob-colors">
+    <span class="mc-lbl">لون:</span>
+    <div class="mc-sw on" id="ms0" style="background:#22c55e" onclick="pickColor('#22c55e',0)"></div>
+    <div class="mc-sw" id="ms1" style="background:#f97316" onclick="pickColor('#f97316',1)"></div>
+    <div class="mc-sw" id="ms2" style="background:#3b82f6" onclick="pickColor('#3b82f6',2)"></div>
+    <div class="mc-sw" id="ms3" style="background:#eab308" onclick="pickColor('#eab308',3)"></div>
+    <div class="mc-sw" id="ms4" style="background:#ef4444" onclick="pickColor('#ef4444',4)"></div>
+    <input type="color" id="mfc" value="#22c55e" oninput="document.getElementById('fc').value=this.value">
+    <div class="mc-sep"></div>
+    <span class="mc-lbl">شفافية:</span>
+    <input type="range" id="malpha" min="20" max="220" value="110" oninput="document.getElementById('falpha').value=this.value">
+    <div class="mc-sep"></div>
+    <span class="mc-lbl">شارع:</span>
+    <input type="color" id="mrc" value="#ef4444" oninput="document.getElementById('rc').value=this.value">
+    <button class="mc-btn" onclick="cycleWidth()">سُمك: <span id="mrw">5</span></button>
+  </div>
+</div>
+
+<!-- ══ BOTTOM SHEET ══ -->
+<div id="sheet-bg" onclick="closeSheet()"></div>
+<div id="sheet">
+  <div class="sh-handle"></div>
+  <div class="sh-hdr"><span class="sh-title">📋 مخططاتي</span><span style="font-size:20px;color:#aaa;cursor:pointer;padding:4px" onclick="closeSheet()">✕</span></div>
+  <button class="sh-new-btn" onclick="closeSheet();openModal()">＋ مخطط جديد</button>
+  <div class="sh-body" id="sh-list"></div>
+</div>
+
+<!-- ══ MODAL ══ -->
+<div class="overlay" id="modal">
+  <div class="sheet-modal">
+    <h3>🗺️ مخطط جديد</h3>
+    <div class="field">
+      <label>اسم المخطط</label>
+      <input type="text" id="inp-name" placeholder="مثال: حي النخيل" maxlength="60" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>صورة المخطط</label>
+      <div class="upload-box" id="upbox" onclick="document.getElementById('inp-file').click()">
+        <span id="uplbl">📁 اضغط لاختيار صورة</span>
+      </div>
+      <input type="file" id="inp-file" accept="image/*" style="display:none" onchange="onFile(event)">
+    </div>
+    <div class="row-btns">
+      <button class="btn" onclick="closeModal()">إلغاء</button>
+      <button class="btn btn-primary" id="btn-create" onclick="createPlan()" disabled>إنشاء المخطط</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONFIRM ══ -->
+<div id="confirm-overlay">
+  <div id="confirm-box">
+    <p id="confirm-msg"></p>
+    <div class="row-btns">
+      <button class="btn" onclick="resolveConfirm(false)">إلغاء</button>
+      <button class="btn" style="background:#ef4444;color:#fff;border-color:#ef4444" onclick="resolveConfirm(true)">تأكيد</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+window._appReady=false;
+import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import{getFirestore,collection,doc,setDoc,getDocs,deleteDoc,serverTimestamp}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+const FB=initializeApp({apiKey:'AIzaSyAJPLYOGXYKTGlJk53OGt-IjpqbSOFFZD0',projectId:'plan-no-1692'});
+const db=getFirestore(FB);
+const COL='plans',CLD='dckjuqaav',PRESET='plans_upload';
+
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d',{willReadFrequently:true});
+const wrap=document.getElementById('wrap');
+const $=id=>document.getElementById(id);
+
+let imgEl=null,b64=null,cloudUrl=null;
+let actions=[],planId=null,planName='';
+let uStack=[],rStack=[];
+let roadPts=[],roadSnap=null;
+let tool='fill';
+let sc=1,ox=0,oy=0;
+let panning=false,psx=0,psy=0,pox=0,poy=0,spaceDown=false;
+let saveTimer=null,dropOpen=false,pendingB64=null;
+let rws=[3,5,8,12],rwi=1;
+
+// ── utils ──
+const mob=()=>window.innerWidth<=768;
+function h2r(h){return[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function fmtD(ts){if(!ts)return'';const d=new Date(ts.seconds*1000),df=Date.now()-d.getTime();if(df<60000)return'الآن';if(df<3600000)return`${Math.floor(df/60000)} د`;if(df<86400000)return`${Math.floor(df/3600000)} س`;return d.toLocaleDateString('ar-SA')}
+
+// ── status ──
+function setS(cls,msg){
+  ['d-status','mob-status'].forEach(id=>{const e=$(id);if(e){e.className=cls+(id==='mob-status'?'':' status');e.textContent=msg;}});
+}
+
+// ── rebuild ──
+function rebuild(){
+  if(!imgEl)return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(imgEl,0,0);
+  actions.forEach(a=>{if(a.type==='fill')fill(a.x,a.y,a.color,a.alpha);else if(a.type==='road')drawRoad(a.pts,a.color,a.w);});
+}
+function fill(sx,sy,color,alpha){
+  const[fr,fg,fb]=h2r(color);
+  const id=ctx.getImageData(0,0,canvas.width,canvas.height),d=id.data,W=canvas.width,H=canvas.height;
+  if(sx<0||sy<0||sx>=W||sy>=H)return;
+  const i0=(sy*W+sx)*4,tr=d[i0],tg=d[i0+1],tb=d[i0+2],ta=d[i0+3];
+  if(tr===fr&&tg===fg&&tb===fb&&ta===alpha)return;
+  const ok=i=>Math.abs(d[i]-tr)<=40&&Math.abs(d[i+1]-tg)<=40&&Math.abs(d[i+2]-tb)<=40&&Math.abs(d[i+3]-ta)<=40;
+  const st=[[sx,sy]],vis=new Uint8Array(W*H);
+  while(st.length){const[x,y]=st.pop();if(x<0||x>=W||y<0||y>=H)continue;const i=y*W+x;if(vis[i])continue;vis[i]=1;const p=i*4;if(!ok(p))continue;d[p]=fr;d[p+1]=fg;d[p+2]=fb;d[p+3]=alpha;st.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);}
+  ctx.putImageData(id,0,0);
+}
+function drawRoad(pts,color,w){
+  if(!pts||pts.length<2)return;
+  const p2=pts.map(p=>Array.isArray(p)?p:[p.x,p.y]);
+  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=w;ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.beginPath();ctx.moveTo(p2[0][0],p2[0][1]);p2.slice(1).forEach(p=>ctx.lineTo(p[0],p[1]));ctx.stroke();
+  ctx.fillStyle=color;p2.forEach(([px,py])=>{ctx.beginPath();ctx.arc(px,py,w/1.5,0,Math.PI*2);ctx.fill();});
+  ctx.restore();
+}
+
+// ── undo/redo ──
+function snap(){uStack.push(JSON.stringify(actions));if(uStack.length>40)uStack.shift();rStack=[];updBtns();schedSave();}
+window.undo=()=>{if(!uStack.length)return;rStack.push(JSON.stringify(actions));actions=JSON.parse(uStack.pop());rebuild();updBtns();schedSave();};
+window.redo=()=>{if(!rStack.length)return;uStack.push(JSON.stringify(actions));actions=JSON.parse(rStack.pop());rebuild();updBtns();schedSave();};
+function updBtns(){
+  $('d-undo').disabled=!uStack.length;$('d-redo').disabled=!rStack.length;
+  const mu=$('m-undo');if(mu)mu.style.opacity=uStack.length?'1':'.4';
+}
+
+// ── tool ──
+window.setTool=t=>{
+  tool=t;
+  const map={fill:'on',road:'on-road',pan:'',del:'on-del'};
+  ['fill','road','pan','del'].forEach(x=>{
+    const db=$('d-'+x),mb=$('m-'+x);
+    const cls=t===x?map[t]:'';
+    if(db)db.className='btn'+(cls?' '+cls:'');
+    if(mb)mb.className='mob-btn'+(cls?' '+cls:'');
+  });
+  if(t!=='road'&&roadPts.length){if(roadSnap)ctx.putImageData(roadSnap,0,0);roadPts=[];roadSnap=null;}
+  const rh=$('road-hint');if(rh)rh.classList.toggle('show',t==='road');
+  if(!mob())wrap.style.cursor=t==='fill'?'crosshair':t==='road'?'cell':t==='del'?'pointer':'grab';
+};
+
+window.finishRoad=()=>{
+  if(roadPts.length<2){roadPts=[];roadSnap=null;window.setTool('fill');return;}
+  const color=$('rc').value,w=parseInt($('rw').value);
+  actions.push({type:'road',pts:roadPts.map(([x,y])=>({x,y})),color,w});
+  rebuild();roadPts=[];roadSnap=null;window.setTool('fill');
+};
+
+// ── coords ──
+function cxy(cx,cy){const r=wrap.getBoundingClientRect();return[Math.round((cx-r.left-ox)/sc),Math.round((cy-r.top-oy)/sc)];}
+
+// ── delete ──
+function delAt(x,y){
+  const thr=12/sc;
+  for(let i=actions.length-1;i>=0;i--){
+    const a=actions[i];
+    if(a.type==='road'){
+      const pts=a.pts.map(p=>Array.isArray(p)?p:[p.x,p.y]);
+      for(let j=0;j<pts.length-1;j++){if(dSeg([x,y],pts[j],pts[j+1])<thr+a.w/2){snap();actions.splice(i,1);rebuild();return;}}
+    }
+  }
+  const px=ctx.getImageData(x,y,1,1).data;if(px[3]<10)return;
+  for(let i=actions.length-1;i>=0;i--){
+    const a=actions[i];
+    if(a.type==='fill'){const[fr,fg,fb]=h2r(a.color);if(Math.abs(px[0]-fr)<30&&Math.abs(px[1]-fg)<30&&Math.abs(px[2]-fb)<30){snap();actions.splice(i,1);rebuild();return;}}
+  }
+}
+function dSeg(p,a,b){const dx=b[0]-a[0],dy=b[1]-a[1];if(!dx&&!dy)return Math.hypot(p[0]-a[0],p[1]-a[1]);const t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy)));return Math.hypot(p[0]-(a[0]+t*dx),p[1]-(a[1]+t*dy));}
+
+// ── road preview ──
+function roadPrev(prev){
+  if(roadSnap)ctx.putImageData(roadSnap,0,0);
+  const color=$('rc').value,lw=parseInt($('rw').value);
+  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=lw;ctx.lineCap='round';ctx.lineJoin='round';
+  if(roadPts.length>=2){ctx.beginPath();ctx.moveTo(roadPts[0][0],roadPts[0][1]);roadPts.slice(1).forEach(p=>ctx.lineTo(p[0],p[1]));ctx.stroke();}
+  if(prev&&roadPts.length){ctx.setLineDash([6,5]);ctx.globalAlpha=.5;const l=roadPts[roadPts.length-1];ctx.beginPath();ctx.moveTo(l[0],l[1]);ctx.lineTo(prev[0],prev[1]);ctx.stroke();}
+  ctx.setLineDash([]);ctx.globalAlpha=1;ctx.fillStyle=color;
+  roadPts.forEach(([px,py])=>{ctx.beginPath();ctx.arc(px,py,lw/1.5,0,Math.PI*2);ctx.fill();});
+  ctx.restore();
+}
+
+// ── mouse (desktop) ──
+wrap.addEventListener('mousedown',e=>{
+  if(!imgEl||mob())return;
+  if(tool==='pan'||spaceDown){panning=true;psx=e.clientX;psy=e.clientY;pox=ox;poy=oy;wrap.style.cursor='grabbing';return;}
+  const[x,y]=cxy(e.clientX,e.clientY);if(x<0||y<0||x>=canvas.width||y>=canvas.height)return;
+  if(tool==='fill'){const c=$('fc').value,a=parseInt($('falpha').value);snap();fill(x,y,c,a);actions.push({type:'fill',x,y,color:c,alpha:a});}
+  else if(tool==='road'){if(!roadPts.length){roadSnap=ctx.getImageData(0,0,canvas.width,canvas.height);snap();}roadPts.push([x,y]);roadPrev(null);}
+  else if(tool==='del')delAt(x,y);
+});
+wrap.addEventListener('mousemove',e=>{
+  if(!imgEl||mob())return;
+  if(panning){ox=pox+(e.clientX-psx);oy=poy+(e.clientY-psy);applyT();return;}
+  const[x,y]=cxy(e.clientX,e.clientY);$('coord').textContent=`x:${x} y:${y}`;
+  if(tool==='road'&&roadPts.length)roadPrev([x,y]);
+});
+wrap.addEventListener('mouseup',()=>{panning=false;if(!mob())wrap.style.cursor=tool==='fill'?'crosshair':tool==='road'?'cell':tool==='del'?'pointer':'grab';});
+wrap.addEventListener('dblclick',()=>{if(!mob()&&tool==='road'&&roadPts.length>=2)window.finishRoad();});
+
+// ── touch (mobile) ──
+let _T={},_ld=0,_pinch=false,_tpan=false,_ltx=0,_lty=0;
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  Array.from(e.changedTouches).forEach(t=>_T[t.identifier]={x:t.clientX,y:t.clientY});
+  const ids=Object.keys(_T);
+  if(ids.length>=2){_pinch=true;_tpan=false;const[a,b]=[_T[ids[0]],_T[ids[1]]];_ld=Math.hypot(a.x-b.x,a.y-b.y);return;}
+  if(ids.length===1&&!_pinch){
+    const t=e.changedTouches[0];_ltx=t.clientX;_lty=t.clientY;
+    if(tool==='pan'){_tpan=true;return;}
+    if(!imgEl)return;
+    const[x,y]=cxy(t.clientX,t.clientY);if(x<0||y<0||x>=canvas.width||y>=canvas.height)return;
+    if(tool==='fill'){const c=$('mfc').value||$('fc').value,a=parseInt($('malpha').value||$('falpha').value);snap();fill(x,y,c,a);actions.push({type:'fill',x,y,color:c,alpha:a});}
+    else if(tool==='road'){if(!roadPts.length){roadSnap=ctx.getImageData(0,0,canvas.width,canvas.height);snap();}roadPts.push([x,y]);roadPrev(null);}
+    else if(tool==='del')delAt(x,y);
+  }
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  Array.from(e.changedTouches).forEach(t=>{if(_T[t.identifier])_T[t.identifier]={x:t.clientX,y:t.clientY};});
+  const ids=Object.keys(_T);
+  if(ids.length>=2&&_pinch){
+    const[a,b]=[_T[ids[0]],_T[ids[1]]];
+    const dist=Math.hypot(a.x-b.x,a.y-b.y);const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};const f=dist/_ld,p=sc;
+    sc=Math.min(Math.max(sc*f,.05),20);ox=mid.x-(mid.x-ox)*(sc/p);oy=mid.y-(mid.y-oy)*(sc/p);
+    applyT();_ld=dist;return;
+  }
+  if(ids.length===1){
+    const t=e.changedTouches[0];
+    if(_tpan||tool==='pan'){ox+=t.clientX-_ltx;oy+=t.clientY-_lty;applyT();}
+    else if(tool==='road'&&roadPts.length){const[x,y]=cxy(t.clientX,t.clientY);roadPrev([x,y]);}
+    _ltx=t.clientX;_lty=t.clientY;
+  }
+},{passive:false});
+canvas.addEventListener('touchend',e=>{
+  Array.from(e.changedTouches).forEach(t=>delete _T[t.identifier]);
+  if(Object.keys(_T).length<2){_pinch=false;_tpan=false;}
+},{passive:false});
+
+// ── zoom ──
+function applyT(){canvas.style.transform=`translate(${ox}px,${oy}px) scale(${sc})`;const zl=$('zlbl');if(zl)zl.textContent=Math.round(sc*100)+'%';}
+window.doZoom=f=>{const cx=wrap.clientWidth/2,cy=wrap.clientHeight/2,p=sc;sc=Math.min(Math.max(sc*f,.05),20);ox=cx-(cx-ox)*(sc/p);oy=cy-(cy-oy)*(sc/p);applyT();};
+window.fitZoom=()=>{if(!imgEl)return;sc=Math.min(wrap.clientWidth/canvas.width,wrap.clientHeight/canvas.height,1);ox=(wrap.clientWidth-canvas.width*sc)/2;oy=(wrap.clientHeight-canvas.height*sc)/2;applyT();};
+wrap.addEventListener('wheel',e=>{e.preventDefault();const r=wrap.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,p=sc;sc=Math.min(Math.max(sc*(e.deltaY<0?1.12:.89),.05),20);ox=mx-(mx-ox)*(sc/p);oy=my-(my-oy)*(sc/p);applyT();},{passive:false});
+
+// ── keyboard ──
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){e.preventDefault();window.undo();}
+  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){e.preventDefault();window.redo();}
+  if(e.code==='Space'&&!e.repeat){e.preventDefault();spaceDown=true;wrap.style.cursor='grab';}
+  if(e.key==='Escape'&&roadPts.length){if(roadSnap)ctx.putImageData(roadSnap,0,0);roadPts=[];roadSnap=null;uStack.pop();updBtns();}
+});
+document.addEventListener('keyup',e=>{if(e.code==='Space'){spaceDown=false;wrap.style.cursor=tool==='fill'?'crosshair':'grab';}});
+document.addEventListener('click',e=>{if(dropOpen&&!e.target.closest('.dd-wrap'))closeDrop();});
+
+// ── colors ──
+window.pickColor=(c,i)=>{
+  $('fc').value=c;if($('mfc'))$('mfc').value=c;
+  for(let j=0;j<5;j++){$('sw'+j)?.classList.remove('on');$('ms'+j)?.classList.remove('on');}
+  $('sw'+i)?.classList.add('on');$('ms'+i)?.classList.add('on');
+};
+window.cycleWidth=()=>{rwi=(rwi+1)%rws.length;const w=rws[rwi];$('rw').value=w;if($('mrw'))$('mrw').textContent=w;};
+window.clearAll=()=>{if(!imgEl)return;snap();actions=[];rebuild();};
+window.exportImg=()=>{if(!imgEl)return;const a=document.createElement('a');a.download=(planName||'مخطط')+'.png';a.href=canvas.toDataURL('image/png');a.click();};
+
+// ── modal ──
+window.openModal=()=>{$('inp-name').value='';$('uplbl').textContent='📁 اضغط لاختيار صورة';$('upbox').classList.remove('done');$('btn-create').disabled=true;$('inp-file').value='';pendingB64=null;$('modal').classList.add('open');setTimeout(()=>$('inp-name').focus(),300);};
+window.closeModal=()=>{$('modal').classList.remove('open');pendingB64=null;};
+window.onFile=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{pendingB64=ev.target.result;$('uplbl').textContent='✅ '+f.name;$('upbox').classList.add('done');chk();};r.readAsDataURL(f);};
+$('inp-name').addEventListener('input',chk);
+$('inp-name').addEventListener('keydown',e=>{if(e.key==='Enter')window.createPlan();});
+function chk(){$('btn-create').disabled=!($('inp-name').value.trim()&&pendingB64);}
+
+// ── create ──
+window.createPlan=async()=>{
+  const name=$('inp-name').value.trim();if(!name||!pendingB64)return;
+  planId='plan_'+Date.now();planName=name;actions=[];cloudUrl=null;b64=pendingB64;
+  uStack=[];rStack=[];updBtns();roadPts=[];roadSnap=null;
+  setPlanName(name);window.closeModal();
+  setS('saving','⏳ تحميل...');
+  await loadB64(b64);
+  $('dt-tools').style.display='flex';
+  setS('saving','⏳ رفع الصورة...');
+  try{cloudUrl=await uploadCLD(b64,planId);await saveFS();}
+  catch(e){setS('error','✗ '+e.message);console.error(e);}
+};
+function setPlanName(n){
+  $('d-plan').textContent='🗺 '+n;
+  const mp=$('mob-plan');if(mp)mp.textContent='🗺 '+n;
+}
+function loadB64(data){return new Promise(res=>{const img=new Image();img.onload=()=>{imgEl=img;canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;ctx.drawImage(img,0,0);$('dz').classList.add('hide');fitZoom();res();};img.src=data;});}
+async function uploadCLD(data,pid){
+  const fd=new FormData();fd.append('file',data);fd.append('upload_preset',PRESET);fd.append('public_id',pid);
+  const res=await fetch(`https://api.cloudinary.com/v1_1/${CLD}/image/upload`,{method:'POST',body:fd});
+  const json=await res.json();if(json.error)throw new Error(json.error.message);if(!json.secure_url)throw new Error('no URL');return json.secure_url;
+}
+
+// ── save ──
+function schedSave(){if(!planId||!cloudUrl)return;setS('saving','⏳ حفظ...');clearTimeout(saveTimer);saveTimer=setTimeout(saveFS,2000);}
+async function saveFS(){
+  if(!planId||!cloudUrl)return;
+  try{
+    const t=document.createElement('canvas');t.width=120;t.height=Math.round(120*canvas.height/canvas.width);t.getContext('2d').drawImage(canvas,0,0,t.width,t.height);
+    await setDoc(doc(db,COL,planId),{name:planName,imageUrl:cloudUrl,actions,thumb:t.toDataURL('image/png'),updatedAt:serverTimestamp()},{merge:true});
+    setS('saved','✓ محفوظ');loadLists();
+  }catch(e){setS('error','✗ '+e.message);console.error(e);}
+}
+
+// ── load ──
+async function loadPlan(id){
+  try{
+    setS('saving','⏳ تحميل...');
+    const snap=await getDocs(collection(db,COL));
+    const found=snap.docs.find(d=>d.id===id);if(!found){setS('error','✗ غير موجود');return;}
+    const data=found.data();if(!data.imageUrl){setS('error','✗ لا توجد صورة');return;}
+    planId=id;planName=data.name||'بدون اسم';actions=data.actions||[];cloudUrl=data.imageUrl;
+    setPlanName(planName);$('dt-tools').style.display='flex';
+    closeDrop();closeSheet();
+    const img=new Image();img.crossOrigin='anonymous';
+    img.onload=()=>{imgEl=img;canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;rebuild();$('dz').classList.add('hide');uStack=[];rStack=[];updBtns();roadPts=[];roadSnap=null;fitZoom();setS('saved','✓ محفوظ');};
+    img.onerror=()=>setS('error','✗ فشل تحميل الصورة');
+    img.src=data.imageUrl;
+  }catch(e){setS('error','✗ '+e.message);}
+}
+window._load=loadPlan;
+
+// ── delete plan ──
+window._del=async(id,name)=>{
+  const ok=await askConfirm(`حذف مخطط "${name}"؟`);if(!ok)return;
+  await deleteDoc(doc(db,COL,id));
+  if(planId===id){planId=null;planName='';actions=[];cloudUrl=null;imgEl=null;$('d-plan').textContent='لا يوجد مخطط';const mp=$('mob-plan');if(mp)mp.textContent='اختر مخططاً أو أنشئ جديداً';setS('idle','');$('dt-tools').style.display='none';$('dz').classList.remove('hide');}
+  loadLists();
+};
+
+// ── lists ──
+function planRowHTML(p,isMobSheet){
+  const c=p.id===planId;
+  if(isMobSheet) return`<div class="sh-row${c?' cur':''}" onclick="window._load('${p.id}')">${p.thumb?`<img src="${p.thumb}">`:`<div class="no-img">🗺️</div>`}<div class="sh-info"><div class="sh-name">${esc(p.name||'بدون اسم')}</div><div class="sh-date">${fmtD(p.updatedAt)}</div></div><button class="sh-del" onclick="event.stopPropagation();window._del('${p.id}','${esc(p.name||'')}')">حذف</button></div>`;
+  return`<div class="plan-row${c?' cur':''}" onclick="window._load('${p.id}')">${p.thumb?`<img src="${p.thumb}">`:`<div class="no-img">🗺️</div>`}<div class="plan-info"><div class="plan-name">${esc(p.name||'بدون اسم')}</div><div class="plan-date">${fmtD(p.updatedAt)}</div></div><button class="del-btn" onclick="event.stopPropagation();window._del('${p.id}','${esc(p.name||'')}')">حذف</button></div>`;
+}
+async function loadLists(){
+  try{
+    const snap=await getDocs(collection(db,COL));
+    const list=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.updatedAt?.seconds||0)-(a.updatedAt?.seconds||0));
+    const dl=$('drop-list'),sl=$('sh-list');
+    const empty='<div style="padding:20px;text-align:center;color:#aaa;font-size:13px">لا توجد مخططات بعد</div>';
+    if(dl)dl.innerHTML=list.length?list.map(p=>planRowHTML(p,false)).join(''):empty;
+    if(sl)sl.innerHTML=list.length?list.map(p=>planRowHTML(p,true)).join(''):empty;
+  }catch(e){console.error(e);}
+}
+
+// ── dropdown ──
+window.toggleDrop=()=>{dropOpen=!dropOpen;$('plans-drop').classList.toggle('open',dropOpen);if(dropOpen)loadLists();};
+function closeDrop(){dropOpen=false;$('plans-drop').classList.remove('open');}
+
+// ── sheet ──
+window.openSheet=()=>{$('sheet-bg').classList.add('open');$('sheet').classList.add('open');loadLists();};
+window.closeSheet=function(){$('sheet-bg').classList.remove('open');$('sheet').classList.remove('open');};
+function closeSheet(){window.closeSheet();}
+
+// ── confirm ──
+let _cb=null;
+window.resolveConfirm=v=>{$('confirm-overlay').classList.remove('open');if(_cb){_cb(v);_cb=null;}};
+function askConfirm(msg){return new Promise(r=>{$('confirm-msg').textContent=msg;$('confirm-overlay').classList.add('open');_cb=r;});}
+
+// ── init ──
+loadLists();
+setS('idle','');
+if(mob())$('dz-p').textContent='اضغط "＋ جديد" في الأسفل';
+</script>
+</body>
+</html>
